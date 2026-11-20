@@ -1,0 +1,29 @@
+services:
+  postgres:
+    # PostgreSQL image with pgvector already installed
+    image: pgvector/pgvector:0.8.7-pg17
+
+    container_name: rag-postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: rag_user
+      POSTGRES_PASSWORD: rag_password
+      POSTGRES_DB: rag_database
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      # Keeps database data even after container restarts
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_database"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
