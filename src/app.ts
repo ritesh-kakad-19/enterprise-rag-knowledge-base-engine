@@ -1,6 +1,7 @@
 import express from "express";
 import logger from "./utils/logger.js";
 import {errorHandler, notFoundHandler} from "./middleware/error.middleware.js";
+import authRoutes from "./modules/auth/auth.routes.js";
 
 // Create an Express application instance.
 const app = express();
@@ -37,6 +38,8 @@ app.get("/health", (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use("/api/v1/auth", authRoutes);
 
 // Handle all unknown routes.
 app.use(notFoundHandler);

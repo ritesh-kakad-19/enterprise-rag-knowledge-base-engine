@@ -26,6 +26,10 @@ const envSchema = z.object({
     .string()
     .url("Invalid database connection URL"),
 
+  JWT_ACCESS_SECRET: z
+  .string()
+  .min(32, "JWT secret must contain at least 32 characters"),
+
 });
 
 // Validate process.env against our schema.
