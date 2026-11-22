@@ -2,6 +2,7 @@ import express from "express";
 import logger from "./utils/logger.js";
 import {errorHandler, notFoundHandler} from "./middleware/error.middleware.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import documentRoutes from "./modules/documents/document.routes.js";
 
 // Create an Express application instance.
 const app = express();
@@ -39,7 +40,11 @@ app.get("/health", (_req, res) => {
   });
 });
 
+// Authentication routes
 app.use("/api/v1/auth", authRoutes);
+
+// Document routes
+app.use("/api/v1/documents", documentRoutes);
 
 // Handle all unknown routes.
 app.use(notFoundHandler);

@@ -148,6 +148,9 @@ export const validateDocumentFile: RequestHandler = asyncHandler(
         },
         "Document file validation successful"
       );
+
+      // File validation succeeded. Continue to the controller.
+      _next();
     } catch (error) {
       // Delete the file if any validation check fails.
       await cleanupUploadedFile(file.path);
