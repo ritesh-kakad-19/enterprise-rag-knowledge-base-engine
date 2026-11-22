@@ -5,6 +5,7 @@ import type {
 
 import { ApiError } from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
+import multer from "multer";
 
 // Handles requests for routes that do not exist.
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
@@ -12,24 +13,47 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 };
 
 // Handles errors from the entire Express application.
-export const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next) => {
-  // If response headers have already been sent,
-  // let Express handle the remaining error.
-  if (res.headersSent) {
-    return next(error);
+export const errorHandler: ErrorRequestHandler = (
+  error,
+  req,
+  res,
+  next
+) => {
+  if (res.headersSent) return next(error);
+
+  const isApiError = error instanceof ApiError;
+  const isMulterError = error instanceof multer.MulterError;
+
+  let statusCode = 500;
+  let message = "Internal server error";
+
+  if (isApiError) {
+    statusCode = error.statusCode;
+    message = error.message;
+  } else if (isMulterError) {
+    // Convert Multer errors into meaningful HTTP responses.
+    switch (error.code) {
+      case "LIMIT_FILE_SIZE":
+        statusCode = 413;
+        message = "File exceeds the maximum allowed size of 10 MB";
+        break;
+
+      case "LIMIT_FILE_COUNT":
+        statusCode = 400;
+        message = "Only one file can be uploaded at a time";
+        break;
+
+      case "LIMIT_UNEXPECTED_FILE":
+        statusCode = 400;
+        message = "Unexpected file field. Use the 'document' field";
+        break;
+
+      default:
+        statusCode = 400;
+        message = "Invalid file upload request";
+    }
   }
 
-  // Identify known application errors.
-  const isApiError = error instanceof ApiError;
-
-  const statusCode = isApiError ? error.statusCode : 500;
-
-  // Never expose unexpected internal errors to clients.
-  const message = isApiError
-    ? error.message
-    : "Internal server error";
-
-  // Record the error for debugging.
   logger.error(
     {
       err: error,
