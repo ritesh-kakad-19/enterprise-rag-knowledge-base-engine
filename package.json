@@ -12,7 +12,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "db:test": "tsx src/scripts/test-db.ts"
+    "db:test": "tsx src/scripts/test-db.ts",
+    "test:text-cleaner": "tsx src/scripts/test-text-cleaner.ts",
+    "test:extraction": "tsx src/scripts/test-document-extraction.ts"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",
