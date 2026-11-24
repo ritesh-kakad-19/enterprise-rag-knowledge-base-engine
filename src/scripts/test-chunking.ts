@@ -1,4 +1,5 @@
 import { chunkDocumentText } from "../modules/documents/chunking/chunking.service.js";
+import { chunkingConfig } from "../config/chunking.js";
 import logger from "../utils/logger.js";
 
 const testChunking = (): void => {
@@ -15,7 +16,7 @@ Employees must inform their manager before taking leave.
 Unused leaves can be carried forward according to company policy.
 
 Special leave approval requires manager authorization.
-`.repeat(3);
+`.repeat(30);
 
     const chunks = chunkDocumentText(sampleText);
 
@@ -29,18 +30,35 @@ Special leave approval requires manager authorization.
       console.log("\n");
     });
 
-    // Verify that no chunk exceeds the configured maximum.
-    const oversizedChunks = chunks.filter(
-      (chunk) => chunk.length > 2000
-    );
+    // Check that no chunk exceeds the configured size.
+    for (const chunk of chunks) {
+      if (chunk.length > chunkingConfig.chunkSize) {
+        throw new Error("Chunk exceeds maximum configured size");
+      }
+    }
 
-    if (oversizedChunks.length > 0) {
-      throw new Error("Some chunks exceed the configured chunk size");
+    // Check that consecutive chunks share the expected overlap.
+    for (let i = 0; i < chunks.length - 1; i++) {
+      const currentChunk = chunks[i];
+      const nextChunk = chunks[i + 1];
+
+      const expectedOverlap = currentChunk.slice(
+        -chunkingConfig.overlap
+      );
+
+      if (!nextChunk.startsWith(expectedOverlap)) {
+        throw new Error(
+          `Overlap validation failed between chunks ${i + 1} and ${i + 2}`
+        );
+      }
     }
 
     logger.info(
-      { totalChunks: chunks.length },
-      "Chunking test passed"
+      {
+        totalChunks: chunks.length,
+        overlap: chunkingConfig.overlap,
+      },
+      "Chunking and overlap tests passed"
     );
   } catch (error) {
     logger.error({ err: error }, "Chunking test failed");

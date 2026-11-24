@@ -3,15 +3,10 @@ import { ApiError } from "../../../utils/ApiError.js";
 import logger from "../../../utils/logger.js";
 
 /**
- * Finds the best splitting position within the allowed chunk size.
+ * Finds the best splitting position within the maximum chunk size.
  *
- * Priority:
- * 1. Paragraph boundary
- * 2. Line boundary
- * 3. Sentence boundary
- * 4. Word boundary
- *
- * If no suitable boundary exists, split at the maximum size.
+ * Prefers meaningful boundaries such as:
+ * paragraph -> line -> sentence -> word.
  */
 const findSplitPosition = (
   text: string,
@@ -33,80 +28,79 @@ const findSplitPosition = (
     }
   }
 
-  // If no separator is found, split at the maximum allowed size.
+  // If no suitable boundary exists, split at the maximum size.
   return bestPosition > 0 ? bestPosition : maxLength;
 };
 
 /**
- * Divides cleaned document text into smaller chunks.
+ * Divides document text into smaller chunks with overlapping content.
  *
- * Note: Overlap will be implemented separately in Part 7.3.
+ * Example:
+ * Chunk 1: Characters 0-2000
+ * Chunk 2: Characters 1800-3800
+ * Chunk 3: Characters 3600-5600
+ *
+ * Each consecutive chunk shares 200 characters.
  */
 export const chunkDocumentText = (cleanedText: string): string[] => {
   if (typeof cleanedText !== "string" || !cleanedText.trim()) {
     throw new ApiError(400, "Document text cannot be empty");
   }
 
-  const { chunkSize, minChunkSize } = chunkingConfig;
+  const { chunkSize, overlap } = chunkingConfig;
 
   try {
+    const text = cleanedText.trim();
     const chunks: string[] = [];
 
-    let remainingText = cleanedText.trim();
+    let start = 0;
 
-    while (remainingText.length > 0) {
+    while (start < text.length) {
       // If remaining text fits into one chunk, save it.
-      if (remainingText.length <= chunkSize) {
-        chunks.push(remainingText);
+      const remainingLength = text.length - start;
+
+      if (remainingLength <= chunkSize) {
+        chunks.push(text.slice(start));
         break;
       }
 
-      // Find a meaningful boundary within the configured size.
+      // Look for a meaningful splitting position.
+      const remainingText = text.slice(start);
       const splitPosition = findSplitPosition(
         remainingText,
         chunkSize
       );
 
-      const chunk = remainingText
-        .slice(0, splitPosition)
-        .trim();
+      const end = start + splitPosition;
 
-      if (!chunk) {
+      // Extract the current chunk without trimming its boundaries.
+      const chunk = text.slice(start, end);
+
+      if (!chunk.length) {
         throw new Error("Unable to create a valid document chunk");
       }
 
       chunks.push(chunk);
 
-      // Continue processing the remaining text.
-      remainingText = remainingText
-        .slice(splitPosition)
-        .trimStart();
-    }
+      // Move the starting position backwards to preserve overlap.
+      const nextStart = end - overlap;
 
-    // Avoid leaving an unnecessarily small final chunk
-    // when it can safely fit into the previous chunk.
-    if (chunks.length > 1) {
-      const lastChunk = chunks[chunks.length - 1];
-      const previousChunk = chunks[chunks.length - 2];
-
-      if (
-        lastChunk.length < minChunkSize &&
-        previousChunk.length + 1 + lastChunk.length <= chunkSize
-      ) {
-        chunks[chunks.length - 2] =
-          `${previousChunk}\n${lastChunk}`;
-
-        chunks.pop();
+      // Safety check: every iteration must make forward progress.
+      if (nextStart <= start) {
+        throw new Error("Invalid chunk overlap configuration");
       }
+
+      start = nextStart;
     }
 
     logger.info(
       {
-        totalCharacters: cleanedText.length,
+        totalCharacters: text.length,
         totalChunks: chunks.length,
         chunkSize,
+        overlap,
       },
-      "Document text chunking completed"
+      "Document chunking with overlap completed"
     );
 
     return chunks;
@@ -117,7 +111,7 @@ export const chunkDocumentText = (cleanedText: string): string[] => {
 
     logger.error(
       { err: error },
-      "Document text chunking failed"
+      "Document chunking failed"
     );
 
     throw new ApiError(500, "Failed to chunk document text");
