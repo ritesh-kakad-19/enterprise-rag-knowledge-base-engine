@@ -30,7 +30,20 @@ const envSchema = z.object({
   .string()
   .min(32, "JWT secret must contain at least 32 characters"),
 
-});
+  // Document chunking configuration
+  CHUNK_SIZE_CHARS: z.coerce.number().int().min(500).max(10000).default(2000),
+
+  CHUNK_OVERLAP_CHARS: z.coerce.number().int().min(0).max(2000).default(200),
+
+  MIN_CHUNK_SIZE_CHARS: z.coerce.number().int().min(50).max(2000).default(100),
+
+}).refine(
+  (config) => config.CHUNK_OVERLAP_CHARS < config.CHUNK_SIZE_CHARS,
+  {
+    message: "Chunk overlap must be smaller than chunk size",
+    path: ["CHUNK_OVERLAP_CHARS"],
+  }
+);
 
 // Validate process.env against our schema.
 const result = envSchema.safeParse(process.env);
