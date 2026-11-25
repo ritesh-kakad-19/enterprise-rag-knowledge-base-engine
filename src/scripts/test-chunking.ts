@@ -4,6 +4,8 @@ import logger from "../utils/logger.js";
 
 const testChunking = (): void => {
   try {
+    const documentId = "11111111-1111-4111-8111-111111111111";
+
     const sampleText = `
 Company Leave Policy
 
@@ -18,37 +20,60 @@ Unused leaves can be carried forward according to company policy.
 Special leave approval requires manager authorization.
 `.repeat(30);
 
-    const chunks = chunkDocumentText(sampleText);
+    const chunks = chunkDocumentText(
+      sampleText,
+      documentId
+    );
 
     console.log("\n========== CHUNKING TEST ==========\n");
 
-    chunks.forEach((chunk, index) => {
-      console.log(`CHUNK ${index + 1}`);
-      console.log(`Characters: ${chunk.length}`);
+    chunks.forEach((chunk) => {
+      console.log(`CHUNK ${chunk.chunkIndex}`);
+      console.log(`Document ID: ${chunk.documentId}`);
+      console.log(`Characters: ${chunk.characterCount}`);
+      console.log(`Start: ${chunk.startChar}`);
+      console.log(`End: ${chunk.endChar}`);
       console.log("----------------------------------");
-      console.log(chunk.slice(0, 200));
+      console.log(chunk.text.slice(0, 200));
       console.log("\n");
     });
 
-    // Check that no chunk exceeds the configured size.
+    // Verify maximum chunk size.
     for (const chunk of chunks) {
-      if (chunk.length > chunkingConfig.chunkSize) {
+      if (chunk.characterCount > chunkingConfig.chunkSize) {
         throw new Error("Chunk exceeds maximum configured size");
+      }
+
+      // Verify metadata matches the actual chunk text.
+      if (chunk.characterCount !== chunk.text.length) {
+        throw new Error("Chunk character count is incorrect");
+      }
+
+      // Verify character positions.
+      if (
+        chunk.endChar - chunk.startChar !== chunk.characterCount
+      ) {
+        throw new Error("Chunk character positions are incorrect");
+      }
+
+      // Verify document ID.
+      if (chunk.documentId !== documentId) {
+        throw new Error("Incorrect document ID in chunk metadata");
       }
     }
 
-    // Check that consecutive chunks share the expected overlap.
+    // Verify overlap between consecutive chunks.
     for (let i = 0; i < chunks.length - 1; i++) {
       const currentChunk = chunks[i];
       const nextChunk = chunks[i + 1];
 
-      const expectedOverlap = currentChunk.slice(
+      const expectedOverlap = currentChunk.text.slice(
         -chunkingConfig.overlap
       );
 
-      if (!nextChunk.startsWith(expectedOverlap)) {
+      if (!nextChunk.text.startsWith(expectedOverlap)) {
         throw new Error(
-          `Overlap validation failed between chunks ${i + 1} and ${i + 2}`
+          `Overlap validation failed between chunks ${i} and ${i + 1}`
         );
       }
     }
@@ -56,9 +81,10 @@ Special leave approval requires manager authorization.
     logger.info(
       {
         totalChunks: chunks.length,
+        documentId,
         overlap: chunkingConfig.overlap,
       },
-      "Chunking and overlap tests passed"
+      "Chunking metadata tests passed"
     );
   } catch (error) {
     logger.error({ err: error }, "Chunking test failed");

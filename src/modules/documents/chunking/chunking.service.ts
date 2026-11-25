@@ -1,11 +1,12 @@
 import { chunkingConfig } from "../../../config/chunking.js";
 import { ApiError } from "../../../utils/ApiError.js";
 import logger from "../../../utils/logger.js";
+import type { DocumentChunk } from "./chunking.types.js";
 
 /**
  * Finds the best splitting position within the maximum chunk size.
  *
- * Prefers meaningful boundaries such as:
+ * Prefers:
  * paragraph -> line -> sentence -> word.
  */
 const findSplitPosition = (
@@ -17,7 +18,13 @@ const findSplitPosition = (
   let bestPosition = -1;
 
   for (const separator of separators) {
-    const position = text.lastIndexOf(separator, maxLength - 1);
+    // Ensure the entire separator fits within maxLength.
+    const searchPosition = maxLength - separator.length;
+
+    const position = text.lastIndexOf(
+      separator,
+      searchPosition
+    );
 
     if (position !== -1) {
       const splitPosition = position + separator.length;
@@ -28,64 +35,86 @@ const findSplitPosition = (
     }
   }
 
-  // If no suitable boundary exists, split at the maximum size.
+  // If no suitable boundary exists, split at maxLength.
   return bestPosition > 0 ? bestPosition : maxLength;
 };
 
 /**
- * Divides document text into smaller chunks with overlapping content.
- *
- * Example:
- * Chunk 1: Characters 0-2000
- * Chunk 2: Characters 1800-3800
- * Chunk 3: Characters 3600-5600
- *
- * Each consecutive chunk shares 200 characters.
+ * Divides cleaned document text into chunks with overlap
+ * and attaches metadata to each chunk.
  */
-export const chunkDocumentText = (cleanedText: string): string[] => {
+export const chunkDocumentText = (
+  cleanedText: string,
+  documentId: string
+): DocumentChunk[] => {
   if (typeof cleanedText !== "string" || !cleanedText.trim()) {
     throw new ApiError(400, "Document text cannot be empty");
+  }
+
+  if (typeof documentId !== "string" || !documentId.trim()) {
+    throw new ApiError(400, "Document ID is required");
   }
 
   const { chunkSize, overlap } = chunkingConfig;
 
   try {
-    const text = cleanedText.trim();
-    const chunks: string[] = [];
+    // Keep the original cleaned text so character offsets
+    // remain accurate relative to this input.
+    const text = cleanedText;
+
+    const chunks: DocumentChunk[] = [];
 
     let start = 0;
 
     while (start < text.length) {
-      // If remaining text fits into one chunk, save it.
       const remainingLength = text.length - start;
 
+      let end: number;
+
+      // If remaining text fits into one chunk,
+      // use the rest of the document.
       if (remainingLength <= chunkSize) {
-        chunks.push(text.slice(start));
-        break;
+        end = text.length;
+      } else {
+        const remainingText = text.slice(start);
+
+        const splitPosition = findSplitPosition(
+          remainingText,
+          chunkSize
+        );
+
+        end = start + splitPosition;
       }
 
-      // Look for a meaningful splitting position.
-      const remainingText = text.slice(start);
-      const splitPosition = findSplitPosition(
-        remainingText,
-        chunkSize
-      );
+      // Extract text using the calculated positions.
+      const chunkText = text.slice(start, end);
 
-      const end = start + splitPosition;
-
-      // Extract the current chunk without trimming its boundaries.
-      const chunk = text.slice(start, end);
-
-      if (!chunk.length) {
+      if (!chunkText.length) {
         throw new Error("Unable to create a valid document chunk");
       }
 
+      // Create metadata for this chunk.
+      const chunk: DocumentChunk = {
+        documentId,
+        chunkIndex: chunks.length,
+        text: chunkText,
+        characterCount: chunkText.length,
+        startChar: start,
+        endChar: end,
+      };
+
       chunks.push(chunk);
 
-      // Move the starting position backwards to preserve overlap.
+      // Stop after processing the final part of the document.
+      if (end === text.length) {
+        break;
+      }
+
+      // Start the next chunk before the current chunk ends
+      // to preserve the configured overlap.
       const nextStart = end - overlap;
 
-      // Safety check: every iteration must make forward progress.
+      // Safety check to prevent an infinite loop.
       if (nextStart <= start) {
         throw new Error("Invalid chunk overlap configuration");
       }
@@ -95,12 +124,13 @@ export const chunkDocumentText = (cleanedText: string): string[] => {
 
     logger.info(
       {
+        documentId,
         totalCharacters: text.length,
         totalChunks: chunks.length,
         chunkSize,
         overlap,
       },
-      "Document chunking with overlap completed"
+      "Document chunking with metadata completed"
     );
 
     return chunks;
@@ -110,7 +140,7 @@ export const chunkDocumentText = (cleanedText: string): string[] => {
     }
 
     logger.error(
-      { err: error },
+      { err: error, documentId },
       "Document chunking failed"
     );
 
