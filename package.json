@@ -15,7 +15,8 @@
     "db:test": "tsx src/scripts/test-db.ts",
     "test:text-cleaner": "tsx src/scripts/test-text-cleaner.ts",
     "test:extraction": "tsx src/scripts/test-document-extraction.ts",
-    "test:chunking": "tsx src/scripts/test-chunking.ts"
+    "test:chunking": "tsx src/scripts/test-chunking.ts",
+    "test:embedding": "tsx src/scripts/test-embedding.ts"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",

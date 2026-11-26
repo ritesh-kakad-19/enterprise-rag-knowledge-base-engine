@@ -37,6 +37,13 @@ const envSchema = z.object({
 
   MIN_CHUNK_SIZE_CHARS: z.coerce.number().int().min(50).max(2000).default(100),
 
+  GEMINI_EMBEDDING_DIMENSIONS: z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(3072)
+  .default(768),
+
 }).refine(
   (config) => config.CHUNK_OVERLAP_CHARS < config.CHUNK_SIZE_CHARS,
   {
