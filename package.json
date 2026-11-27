@@ -18,7 +18,8 @@
     "test:chunking": "tsx src/scripts/test-chunking.ts",
     "test:embedding": "tsx src/scripts/test-embedding.ts",
     "test:document-embedding": "tsx src/scripts/test-document-embedding.ts",
-    "test:vector-utils": "tsx src/scripts/test-vector-utils.ts"
+    "test:vector-utils": "tsx src/scripts/test-vector-utils.ts",
+    "test:document-storage": "tsx src/scripts/test-document-storage.ts"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",
